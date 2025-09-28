@@ -1,0 +1,27 @@
+{
+  "name": "task-management-scheduler",
+  "version": "1.0.0",
+  "description": "Background scheduler service for task management system",
+  "main": "scheduler.js",
+  "scripts": {
+    "dev": "nodemon scheduler.js",
+    "start": "node scheduler.js",
+    "test": "node test/scheduler.test.js"
+  },
+  "dependencies": {
+    "mongoose": "^8.0.3",
+    "redis": "^4.6.10",
+    "rrule": "^2.7.2",
+    "node-cron": "^3.0.3",
+    "zod": "^3.22.4",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2",
+    "jest": "^29.7.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "type": "module"
+}

@@ -1,0 +1,13 @@
+{
+  "name": "shared-schemas",
+  "version": "1.0.0",
+  "description": "Shared Zod validation schemas for task management system",
+  "main": "index.js",
+  "dependencies": {
+    "zod": "^3.25.76"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "type": "module"
+}
