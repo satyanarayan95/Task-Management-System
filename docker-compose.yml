@@ -3,6 +3,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+    env_file:
+      - .env
     ports:
       - "3000:3000"
     volumes:
@@ -10,7 +12,7 @@ services:
       - /app/node_modules
       - ./shared:/app/shared
     environment:
-      - VITE_API_URL=http://localhost:5500/api
+      - VITE_API_URL=${VITE_API_URL:-http://localhost:5500/api}
     depends_on:
       backend:
         condition: service_healthy
@@ -27,6 +29,8 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    env_file:
+      - .env
     ports:
       - "5500:5500"
     volumes:
@@ -34,11 +38,11 @@ services:
       - /app/node_modules
       - ./shared:/shared
     environment:
-      - NODE_ENV=development
-      - MONGODB_URI=mongodb://mongodb:27017/taskmanagement
-      - REDIS_URL=redis://redis:6379
-      - JWT_SECRET=demo-jwt-secret-key-for-local-development
-      - PORT=5500
+      - NODE_ENV=${NODE_ENV:-development}
+      - MONGODB_URI=${MONGODB_URI:-mongodb://mongodb:27017/taskmanagement}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+      - JWT_SECRET=${JWT_SECRET:-demo-jwt-secret-key-for-local-development}
+      - PORT=${PORT:-5500}
     depends_on:
       mongodb:
         condition: service_healthy
@@ -57,13 +61,15 @@ services:
     build:
       context: ./scheduler
       dockerfile: Dockerfile
+    env_file:
+      - .env
     volumes:
       - ./scheduler:/app
       - /app/node_modules
     environment:
-      - NODE_ENV=development
-      - MONGODB_URI=mongodb://mongodb:27017/taskmanagement
-      - REDIS_URL=redis://redis:6379
+      - NODE_ENV=${NODE_ENV:-development}
+      - MONGODB_URI=${MONGODB_URI:-mongodb://mongodb:27017/taskmanagement}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
     depends_on:
       mongodb:
         condition: service_healthy
@@ -82,12 +88,14 @@ services:
 
   mongodb:
     image: mongo:7
+    env_file:
+      - .env
     ports:
       - "27018:27017"
     volumes:
       - mongodb_data:/data/db
     environment:
-      - MONGO_INITDB_DATABASE=taskmanagement
+      - MONGO_INITDB_DATABASE=${MONGO_INITDB_DATABASE:-taskmanagement}
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 30s
@@ -99,6 +107,8 @@ services:
 
   redis:
     image: redis:7-alpine
+    env_file:
+      - .env
     ports:
       - "6379:6379"
     volumes:
