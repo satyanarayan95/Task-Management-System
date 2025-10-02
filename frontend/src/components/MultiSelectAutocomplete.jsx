@@ -4,7 +4,7 @@ import { Badge } from './ui/badge';
 import { Input } from './ui/input';
 import { X, ChevronDown, Search, Check } from 'lucide-react';
 import UserAvatar from './UserAvatar';
-import { taskAPI } from '../lib/api';
+import { authAPI } from '../lib/api';
 import { cn } from '../lib/utils';
 import { useAuthStore } from '../stores';
 
@@ -43,7 +43,7 @@ const MultiSelectAutocomplete = ({
     async (search = '') => {
       try {
         setLoading(true);
-        const res = await taskAPI.getUsers(search);
+        const res = await authAPI.getUsers(search);
         if (res.success) {
           let fetched = res.data || [];
           if (currentUser && !fetched.find((u) => u._id === currentUser._id)) {

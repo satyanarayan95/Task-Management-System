@@ -476,8 +476,8 @@ async function createTasks(users, categories) {
         };
       }
       
-      const startDate = task.startDate || task.dueDate || new Date();
-      const rruleString = patternToRRule(recurringPattern, startDate);
+      const startDate = task.startDate || new Date();
+      const rruleString = patternToRRule(recurringPattern, startDate, task.dueDate);
       task.recurringPattern = rruleString;
     }
     
@@ -485,7 +485,7 @@ async function createTasks(users, categories) {
     
     // Create RecurringPattern record for recurring tasks
     if (task.isRecurring && task.recurringPattern) {
-      const startDate = task.startDate || task.dueDate || new Date();
+      const startDate = task.startDate || new Date();
       const nextOccurrence = getNextOccurrence(task.recurringPattern, startDate);
       
       const recurringPatternRecord = new RecurringPattern({

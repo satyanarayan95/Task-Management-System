@@ -5,14 +5,6 @@ export function cn(...inputs) {
   return twMerge(clsx(inputs))
 }
 
-export function highlightSearchTerm(text, searchTerm) {
-  if (!text || !searchTerm) return text;
-  
-  const escapedTerm = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const regex = new RegExp(`(${escapedTerm})`, 'gi');
-  return text.replace(regex, '<mark class="bg-yellow-200 dark:bg-yellow-800 text-yellow-900 dark:text-yellow-100 px-1 rounded">$1</mark>');
-}
-
 export function formatDate(date, format = 'full') {
   if (!date) return '';
   
@@ -95,20 +87,6 @@ export function getRelativeTime(date) {
 export function truncateText(text, maxLength = 100) {
   if (!text || text.length <= maxLength) return text;
   return text.substring(0, maxLength) + '...';
-}
-
-export function formatSearchResultsMessage(count, searchTerm, totalTasks) {
-  if (!searchTerm) return `${count} task${count !== 1 ? 's' : ''}`;
-  
-  if (count === 0) {
-    return `No tasks found matching "${searchTerm}"`;
-  }
-  
-  if (count === totalTasks) {
-    return `All ${count} task${count !== 1 ? 's' : ''} match "${searchTerm}"`;
-  }
-  
-  return `${count} of ${totalTasks} tasks match "${searchTerm}"`;
 }
 
 export function debounce(func, wait) {

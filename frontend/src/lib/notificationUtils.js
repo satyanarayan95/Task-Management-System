@@ -1,4 +1,4 @@
-import { notificationAPI } from '../lib/api'
+import { notificationAPI } from './api'
 
 export const createNotification = async (notificationData) => {
   try {

@@ -59,7 +59,6 @@ export const useNotifications = () => {
       
       if (result.success) {
         markAsRead(notificationId)
-        toast.success('Notification marked as read')
         return true
       } else {
         toast.error('Failed to mark notification as read')

@@ -1,5 +1,4 @@
 import Notification from '../models/Notification.js';
-import Task from '../models/Task.js';
 import User from '../models/User.js';
 
 /**
@@ -16,7 +15,6 @@ class NotificationService {
    */
   static async createTaskAssignmentNotification(task, assignee, assigner) {
     try {
-      // Don't create notification if user is assigning task to themselves
       if (assignee._id.toString() === assigner._id.toString()) {
         console.log(`Skipping notification: User ${assigner.fullName} assigned task to themselves`);
         return null;
@@ -37,6 +35,93 @@ class NotificationService {
       return notification;
     } catch (error) {
       console.error('Error creating task assignment notification:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Notify a user that they were unassigned from a task
+   * Uses existing 'shared_task' type
+   */
+  static async createTaskUnassignedNotification(task, recipientUser, updaterUser) {
+    try {
+      if (!recipientUser || recipientUser._id.toString() === updaterUser._id.toString()) {
+        return null;
+      }
+
+      const notification = new Notification({
+        user: recipientUser._id,
+        type: 'shared_task',
+        title: 'You were removed from a task',
+        message: `${updaterUser.fullName} removed you from "${task.title}"`,
+        relatedTask: task._id,
+        triggeredBy: updaterUser._id
+      });
+
+      await notification.save();
+      await notification.populate('relatedTask', 'title status priority');
+
+      return notification;
+    } catch (error) {
+      console.error('Error creating unassigned notification:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Notify assignees about status change
+   * Uses existing 'shared_task' type
+   */
+  static async createTaskStatusChangeNotification(task, recipientUser, updaterUser, oldStatus, newStatus) {
+    try {
+      if (!recipientUser || recipientUser._id.toString() === updaterUser._id.toString()) {
+        return null;
+      }
+
+      const notification = new Notification({
+        user: recipientUser._id,
+        type: 'shared_task',
+        title: 'Task status updated',
+        message: `${updaterUser.fullName} changed status of "${task.title}" from ${oldStatus} to ${newStatus}`,
+        relatedTask: task._id,
+        triggeredBy: updaterUser._id
+      });
+
+      await notification.save();
+      await notification.populate('relatedTask', 'title status priority');
+
+      return notification;
+    } catch (error) {
+      console.error('Error creating status change notification:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Notify assignees about priority change
+   * Uses existing 'shared_task' type
+   */
+  static async createTaskPriorityChangeNotification(task, recipientUser, updaterUser, oldPriority, newPriority) {
+    try {
+      if (!recipientUser || recipientUser._id.toString() === updaterUser._id.toString()) {
+        return null;
+      }
+
+      const notification = new Notification({
+        user: recipientUser._id,
+        type: 'shared_task',
+        title: 'Task priority updated',
+        message: `${updaterUser.fullName} changed priority of "${task.title}" from ${oldPriority} to ${newPriority}`,
+        relatedTask: task._id,
+        triggeredBy: updaterUser._id
+      });
+
+      await notification.save();
+      await notification.populate('relatedTask', 'title status priority');
+
+      return notification;
+    } catch (error) {
+      console.error('Error creating priority change notification:', error);
       throw error;
     }
   }
@@ -137,8 +222,8 @@ class NotificationService {
       const notification = new Notification({
         user: user._id,
         type: 'reminder',
-        title: 'Recurring task created',
-        message: `A new instance of "${task.title}" has been created`,
+        title: 'New recurring task',
+        message: `A new occurrence of "${task.title}" was added to your tasks`,
         relatedTask: task._id
       });
 

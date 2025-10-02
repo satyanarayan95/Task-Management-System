@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { sortNotifications } from '../utils/notificationUtils'
+import { sortNotifications } from '../lib/notificationUtils'
 
 const useNotificationStore = create((set, get) => ({
   notifications: [],

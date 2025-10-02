@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { taskAPI } from '../lib/api'
+import { authAPI } from '../lib/api'
 
 const useAuthStore = create(
   persist(
@@ -25,11 +25,11 @@ const useAuthStore = create(
       },
 
       logout: async () => {
-        const { accessToken } = get()
+        const { accessToken, refreshToken } = get()
         
         if (accessToken) {
           try {
-            await taskAPI.logout()
+            await authAPI.logout(refreshToken)
           } catch (error) {
             console.error('Logout API call failed:', error)
           }
@@ -46,11 +46,11 @@ const useAuthStore = create(
       },
 
       logoutAll: async () => {
-        const { accessToken } = get()
+        const { accessToken, refreshToken } = get()
         
         if (accessToken) {
           try {
-            await taskAPI.logoutAll()
+            await authAPI.logoutAll(refreshToken)
           } catch (error) {
             console.error('Logout all API call failed:', error)
           }
@@ -79,9 +79,7 @@ const useAuthStore = create(
       refreshAccessToken: async () => {
         const { refreshToken, isRefreshing } = get()
         
-        if (!refreshToken) {
-          throw new Error('No refresh token available')
-        }
+        // When using httpOnly cookies, refreshToken may be null in client state
 
         if (isRefreshing) {
           return new Promise((resolve, reject) => {
@@ -104,7 +102,7 @@ const useAuthStore = create(
         set({ isRefreshing: true })
 
         try {
-          const response = await taskAPI.refreshToken(refreshToken)
+          const response = await authAPI.refreshToken(refreshToken)
           
           if (response.success) {
             set({
@@ -141,9 +139,10 @@ const useAuthStore = create(
       },
 
       initializeAuth: async () => {
-        const { accessToken, refreshToken, user } = get()
-        
-        if (!accessToken || !refreshToken || !user) {
+        const { accessToken, user, refreshAccessToken } = get()
+
+        // If no user info at all, consider unauthenticated
+        if (!user) {
           set({ isAuthenticated: false })
           return
         }
@@ -151,8 +150,18 @@ const useAuthStore = create(
         set({ isLoading: true })
 
         try {
-          const response = await taskAPI.getProfile()
-          
+          if (!accessToken) {
+            // Try to bootstrap an access token using httpOnly cookie
+            try {
+              await refreshAccessToken()
+            } catch (e) {
+              // If refresh fails, treat as logged out
+              set({ isAuthenticated: false, isLoading: false })
+              return
+            }
+          }
+
+          const response = await authAPI.getProfile()
           if (response.success) {
             set({
               isAuthenticated: true,
@@ -162,16 +171,11 @@ const useAuthStore = create(
           } else {
             if (response.error?.code === 'TOKEN_EXPIRED' || response.error?.code === 'INVALID_TOKEN') {
               try {
-                await get().refreshAccessToken()
+                await refreshAccessToken()
                 set({ isAuthenticated: true, isLoading: false })
               } catch (refreshError) {
                 console.error('Token refresh during initialization failed:', refreshError)
-                if (refreshError.message?.includes('REFRESH_TOKEN_EXPIRED') || 
-                    refreshError.message?.includes('INVALID_REFRESH_TOKEN')) {
-                  get().logout()
-                } else {
-                  set({ isAuthenticated: true, isLoading: false })
-                }
+                get().logout()
               }
             } else {
               get().logout()

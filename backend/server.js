@@ -5,6 +5,7 @@ import mongoose from 'mongoose';
 import redis from 'redis';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
+import cookieParser from 'cookie-parser';
 
 dotenv.config();
 
@@ -46,8 +47,9 @@ const authLimiter = rateLimit({
 });
 
 app.use(helmet());
-app.use(cors());
+app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: '10mb' }));
+app.use(cookieParser());
 // app.use(limiter);
 
 app.set('redisClient', redisClient);

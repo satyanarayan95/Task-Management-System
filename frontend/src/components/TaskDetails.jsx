@@ -36,6 +36,7 @@ import {
 import UserAvatar from './UserAvatar';
 import { taskAPI } from '../lib/api';
 import { cn, formatDate, formatDateTime, getPriorityColor, getStatusColor } from '../lib/utils';
+import { formatDuration } from '../lib/durationUtils';
 
 const TaskDetails = ({ 
   isOpen, 
@@ -111,6 +112,36 @@ const TaskDetails = ({
     }
   };
 
+  const getRecurrenceDescription = (pattern) => {
+    if (!pattern) return 'No recurrence pattern';
+    
+    const frequency = pattern.frequency || 'daily';
+    const interval = pattern.interval || 1;
+    
+    let description = `Repeats every ${interval} ${frequency}`;
+    if (interval > 1) {
+      description += 's';
+    }
+    
+    if (pattern.daysOfWeek && pattern.daysOfWeek.length > 0) {
+      const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      const days = pattern.daysOfWeek.map(d => dayNames[d]).join(', ');
+      description += ` on ${days}`;
+    }
+    
+    if (pattern.dayOfMonth) {
+      description += ` on day ${pattern.dayOfMonth}`;
+    }
+    
+    if (pattern.endDate) {
+      description += ` until ${formatDate(pattern.endDate)}`;
+    } else if (pattern.endOccurrences) {
+      description += ` for ${pattern.endOccurrences} occurrence${pattern.endOccurrences > 1 ? 's' : ''}`;
+    }
+    
+    return description;
+  };
+
   if (loading) {
     return (
       <Dialog open={isOpen} onOpenChange={onClose}>
@@ -148,7 +179,7 @@ const TaskDetails = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-8xl max-h-[98vh] overflow-hidden flex flex-col">
         <DialogHeader className="flex-shrink-0">
           <div className="flex items-start justify-between">
             <div className="flex-1 min-w-0">
@@ -277,7 +308,7 @@ const TaskDetails = ({
                   </Card>
                 )}
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   {task.startDate && (
                     <Card>
                       <CardHeader className="pb-3">
@@ -287,7 +318,7 @@ const TaskDetails = ({
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <p className="text-sm">{formatDate(task.startDate)}</p>
+                        <p className="text-sm">{formatDateTime(task.startDate)}</p>
                       </CardContent>
                     </Card>
                   )}
@@ -305,8 +336,35 @@ const TaskDetails = ({
                           "text-sm",
                           isOverdue() && "text-red-600 font-medium"
                         )}>
-                          {formatDate(task.dueDate)}
+                          {formatDateTime(task.dueDate)}
                           {isOverdue() && " (Overdue)"}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {task.duration && (
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm font-medium flex items-center gap-2">
+                          <Clock className="h-4 w-4" />
+                          Duration
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-sm font-medium">
+                          {formatDuration(task.duration)}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Total: {(() => {
+                            let total = 0;
+                            total += (task.duration.years || 0) * 365 * 24 * 60;
+                            total += (task.duration.months || 0) * 30 * 24 * 60;
+                            total += (task.duration.days || 0) * 24 * 60;
+                            total += (task.duration.hours || 0) * 60;
+                            total += (task.duration.minutes || 0);
+                            return total;
+                          })()} minutes
                         </p>
                       </CardContent>
                     </Card>
@@ -328,6 +386,57 @@ const TaskDetails = ({
                     </Card>
                   )}
                 </div>
+
+                {/* Recurrence Information */}
+                {(task.isRecurring || task.parentTask) && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-medium flex items-center gap-2">
+                        <Repeat className="h-4 w-4" />
+                        Recurrence Information
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {task.isRecurring && task.recurringPattern && (
+                        <div className="space-y-2">
+                          <div className="text-sm">
+                            <span className="font-medium">Pattern: </span>
+                            {getRecurrenceDescription(task.recurringPattern)}
+                          </div>
+                          {task.recurringPattern.endDate && (
+                            <div className="text-sm">
+                              <span className="font-medium">Ends: </span>
+                              {formatDate(task.recurringPattern.endDate)}
+                            </div>
+                          )}
+                          {task.recurringPattern.endOccurrences && (
+                            <div className="text-sm">
+                              <span className="font-medium">Ends after: </span>
+                              {task.recurringPattern.endOccurrences} occurrences
+                            </div>
+                          )}
+                          {task.recurringPattern.timezone && (
+                            <div className="text-sm">
+                              <span className="font-medium">Timezone: </span>
+                              {task.recurringPattern.timezone}
+                            </div>
+                          )}
+                          {task.recurrenceVersion && (
+                            <div className="text-xs text-gray-500">
+                              Pattern version: {task.recurrenceVersion}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      
+                      {task.parentTask && (
+                        <div className="text-sm text-gray-600">
+                          This is an instance of a recurring task
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
               </TabsContent>
 
               <TabsContent value="assignment" className="space-y-6 m-0">

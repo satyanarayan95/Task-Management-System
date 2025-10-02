@@ -26,6 +26,15 @@ const userSchema = new mongoose.Schema({
       type: String,
       required: true
     },
+    jti: {
+      type: String
+    },
+    userAgent: {
+      type: String
+    },
+    ip: {
+      type: String
+    },
     createdAt: {
       type: Date,
       default: Date.now,
@@ -39,15 +48,12 @@ const userSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Email index is automatically created by unique: true
 
 // Hash password before saving
 userSchema.pre('save', async function(next) {
-  // Only hash the password if it has been modified (or is new)
   if (!this.isModified('passwordHash')) return next();
   
   try {
-    // Hash password with cost of 12
     const salt = await bcrypt.genSalt(12);
     this.passwordHash = await bcrypt.hash(this.passwordHash, salt);
     next();
@@ -62,8 +68,9 @@ userSchema.methods.comparePassword = async function(candidatePassword) {
 };
 
 // Add refresh token
-userSchema.methods.addRefreshToken = function(token) {
-  this.refreshTokens.push({ token });
+userSchema.methods.addRefreshToken = function(token, meta = {}) {
+  const { jti, userAgent, ip } = meta;
+  this.refreshTokens.push({ token, jti, userAgent, ip });
   return this.save();
 };
 

@@ -1,15 +1,14 @@
 import React, { useState, useEffect } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
-import { Separator } from '../components/ui/separator'
-import { Progress } from '../components/ui/progress'
 import { Alert, AlertDescription } from '../components/ui/alert'
 import TaskForm from '../components/TaskForm'
 import UserAvatar from '../components/UserAvatar'
 import { useTaskStore } from '../stores'
 import { taskAPI } from '../lib/api'
+import { taskToast } from '../lib/toast'
 import { cn, formatDate } from '../lib/utils'
 import {
   ArrowLeft,
@@ -18,19 +17,16 @@ import {
   Calendar,
   User,
   Tag,
-  Clock,
   AlertCircle,
   CheckCircle2,
   Circle,
   Play,
   MoreHorizontal,
   Activity,
-  MessageSquare,
-  Bell,
   Repeat,
   FileText,
-  Target,
-  Zap
+  Zap,
+  Clock
 } from 'lucide-react'
 import {
   DropdownMenu,
@@ -65,7 +61,7 @@ const TaskDetailsPage = () => {
 
         const [taskResponse, activityResponse] = await Promise.all([
           taskAPI.getTask(id),
-          taskAPI.getTaskActivity(id)
+          taskAPI.getTaskActivities(id)
         ])
 
         if (taskResponse.success) {
@@ -96,10 +92,11 @@ const TaskDetailsPage = () => {
       if (response.success) {
         setTask(response.data)
         updateTask(response.data)
-        const activityResponse = await taskAPI.getTaskActivity(id)
+        const activityResponse = await taskAPI.getTaskActivities(id)
         if (activityResponse.success) {
           setActivityLog(activityResponse.data)
         }
+        taskToast.statusChanged(newStatus)
       } else {
         setError(response.error.message)
       }
@@ -123,6 +120,7 @@ const TaskDetailsPage = () => {
       const response = await taskAPI.deleteTask(id)
       if (response.success) {
         deleteTask(id)
+        taskToast.deleted()
         navigate('/tasks')
       } else {
         setError(response.error.message)
@@ -472,7 +470,26 @@ const TaskDetailsPage = () => {
                   <div>
                     <p className="text-sm font-medium text-gray-900">Recurrence</p>
                     <p className="text-sm text-gray-600 mt-1">
-                      {task.recurringPattern}
+                      {typeof task.recurringPattern === 'string'
+                        ? task.recurringPattern
+                        : `${task.recurringPattern.frequency} ${task.recurringPattern.endDate ? ` until ${formatDate(task.recurringPattern.endDate)}` : task.recurringPattern.endOccurrences ? ` (${task.recurringPattern.endOccurrences} occurrences)` : ''}`
+                      }
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {task.duration && (
+                <div className="flex items-center space-x-3">
+                  <Clock className="h-4 w-4 text-gray-500" />
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">Duration</p>
+                    <p className="text-sm text-gray-600 mt-1">
+                      {task.duration.years > 0 && `${task.duration.years} year${task.duration.years > 1 ? 's' : ''} `}
+                      {task.duration.months > 0 && `${task.duration.months} month${task.duration.months > 1 ? 's' : ''} `}
+                      {task.duration.days > 0 && `${task.duration.days} day${task.duration.days > 1 ? 's' : ''} `}
+                      {task.duration.hours > 0 && `${task.duration.hours} hour${task.duration.hours > 1 ? 's' : ''} `}
+                      {task.duration.minutes > 0 && `${task.duration.minutes} minute${task.duration.minutes > 1 ? 's' : ''}`}
                     </p>
                   </div>
                 </div>

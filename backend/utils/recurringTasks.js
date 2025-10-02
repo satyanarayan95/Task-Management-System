@@ -1,8 +1,9 @@
 import pkg from 'rrule';
 const { RRule } = pkg;
+import { addToDate, calculateDuration as calculateDurationFromDates } from '../../shared/utils/durationUtils.js';
 
 /**
- * Convert recurring pattern object to RRule string
+ * ENHANCED: Convert recurring pattern object to RRule string
  * @param {Object} pattern - The recurring pattern object
  * @param {Date} startDate - The start date for the recurrence
  * @returns {string} RRule string
@@ -16,23 +17,24 @@ export function patternToRRule(pattern, startDate) {
     dtstart: new Date(startDate)
   };
 
-  switch (pattern.type) {
+  // ENHANCED: Handle new frequency format
+  switch (pattern.frequency) {
     case 'daily':
       options.freq = RRule.DAILY;
-      if (pattern.interval) {
+      if (pattern.interval && pattern.interval > 1) {
         options.interval = pattern.interval;
       }
       break;
 
     case 'weekly':
       options.freq = RRule.WEEKLY;
-      if (pattern.interval) {
+      if (pattern.interval && pattern.interval > 1) {
         options.interval = pattern.interval;
       }
       if (pattern.daysOfWeek && pattern.daysOfWeek.length > 0) {
         // Convert Sunday=0 to Monday=0 format for RRule
-        options.byweekday = pattern.daysOfWeek.map(day => 
-          day === 0 ? RRule.SU : 
+        options.byweekday = pattern.daysOfWeek.map(day =>
+          day === 0 ? RRule.SU :
           day === 1 ? RRule.MO :
           day === 2 ? RRule.TU :
           day === 3 ? RRule.WE :
@@ -40,41 +42,88 @@ export function patternToRRule(pattern, startDate) {
           day === 5 ? RRule.FR :
           RRule.SA
         );
+      } else {
+        throw new Error('Weekly recurrence must specify days of week');
       }
       break;
 
     case 'monthly':
       options.freq = RRule.MONTHLY;
-      if (pattern.interval) {
+      if (pattern.interval && pattern.interval > 1) {
         options.interval = pattern.interval;
       }
       if (pattern.dayOfMonth) {
         options.bymonthday = pattern.dayOfMonth;
+      } else {
+        throw new Error('Monthly recurrence must specify day of month');
       }
       break;
 
-    case 'custom':
-      // For custom patterns, we expect a more detailed configuration
-      // This is a simplified implementation
-      options.freq = RRule.DAILY;
-      if (pattern.interval) {
+    case 'yearly':
+      options.freq = RRule.YEARLY;
+      if (pattern.interval && pattern.interval > 1) {
         options.interval = pattern.interval;
       }
       break;
 
     default:
-      throw new Error(`Unsupported recurring pattern type: ${pattern.type}`);
+      throw new Error(`Unsupported recurring pattern frequency: ${pattern.frequency}`);
   }
 
-  // Add end conditions
+  // ENHANCED: Handle end conditions with proper validation
+  if (pattern.endDate && pattern.endOccurrences) {
+    throw new Error('Cannot specify both end date and end occurrences');
+  }
+
   if (pattern.endDate) {
-    options.until = new Date(pattern.endDate);
-  } else if (pattern.occurrences) {
-    options.count = pattern.occurrences;
+    const endDate = new Date(pattern.endDate);
+    if (endDate <= startDate) {
+      throw new Error('End date must be after start date');
+    }
+    options.until = endDate;
+  } else if (pattern.endOccurrences) {
+    if (pattern.endOccurrences < 1) {
+      throw new Error('End occurrences must be at least 1');
+    }
+    options.count = pattern.endOccurrences;
   }
 
   const rule = new RRule(options);
   return rule.toString();
+}
+
+/**
+ * NEW: Calculate due date from start date and duration
+ * @param {Date} startDate - Start date
+ * @param {Object} duration - Duration object
+ * @returns {Date} Due date
+ */
+export function calculateDueDate(startDate, duration) {
+  if (!startDate || !duration) return null;
+  
+  try {
+    return addToDate(startDate, duration);
+  } catch (error) {
+    console.error('Error calculating due date:', error);
+    return null;
+  }
+}
+
+/**
+ * NEW: Calculate duration from start and due dates
+ * @param {Date} startDate - Start date
+ * @param {Date} dueDate - Due date
+ * @returns {Object} Duration object
+ */
+export function calculateDuration(startDate, dueDate) {
+  if (!startDate || !dueDate) return null;
+  
+  try {
+    return calculateDurationFromDates(startDate, dueDate);
+  } catch (error) {
+    console.error('Error calculating duration:', error);
+    return null;
+  }
 }
 
 /**
@@ -185,9 +234,181 @@ export function rruleToPattern(rruleString) {
     return null;
   }
 }
-/*
-*
- * Handle recurring task editing with different scopes
+/**
+ * NEW: Create task instance from recurring pattern
+ * @param {Object} parentTask - The parent recurring task
+ * @param {Date} instanceDate - The date for this instance
+ * @param {Number} instanceNumber - The instance number
+ * @param {Object} models - Object containing Task and RecurringPattern models
+ * @returns {Object} Created task instance
+ */
+export async function createTaskInstance(parentTask, instanceDate, instanceNumber, models) {
+  const { Task, RecurringPattern } = models;
+  
+  try {
+    // Calculate due date from duration
+    const dueDate = calculateDueDate(instanceDate, parentTask.duration);
+    
+    const instanceData = {
+      title: parentTask.title,
+      description: parentTask.description,
+      status: 'todo',
+      priority: parentTask.priority,
+      category: parentTask.category,
+      owner: parentTask.owner,
+      assignees: parentTask.assignees,
+      startDate: new Date(instanceDate),
+      duration: parentTask.duration,
+      dueDate: dueDate,
+      parentTask: parentTask._id,
+      instanceNumber: instanceNumber,
+      recurrenceVersion: parentTask.recurrenceVersion,
+      isRecurring: false, // Instances are not recurring themselves
+      recurringPattern: null
+    };
+
+    const instance = new Task(instanceData);
+    await instance.save();
+    
+    // Update recurring pattern statistics
+    await RecurringPattern.updateOne(
+      { task: parentTask._id },
+      {
+        $inc: { totalInstancesCreated: 1 },
+        $set: {
+          lastInstanceDate: instanceDate,
+          lastGenerated: new Date()
+        }
+      }
+    );
+
+    return instance;
+  } catch (error) {
+    console.error('Error creating task instance:', error);
+    throw error;
+  }
+}
+
+/**
+ * NEW: Generate recurrence preview
+ * @param {Object} task - The task being edited
+ * @param {Object} updateData - The update data
+ * @param {string} editScope - The edit scope
+ * @param {Object} models - Object containing Task and RecurringPattern models
+ * @returns {Object} Preview information
+ */
+export async function generateRecurrencePreview(task, updateData, editScope, models) {
+  const { Task } = models;
+  
+  try {
+    const preview = {
+      editScope,
+      description: '',
+      affectedTasksCount: 0,
+      affectedTasks: [],
+      currentTask: {
+        _id: task._id,
+        title: task.title,
+        isInstance: !!task.parentTask
+      },
+      parentTask: null,
+      instancesCount: 0
+    };
+
+    const parentTaskId = task.parentTask || task._id;
+    
+    if (task.parentTask) {
+      // This is an instance
+      preview.parentTask = await Task.findById(task.parentTask).select('_id title');
+    } else {
+      // This is the parent task
+      preview.parentTask = {
+        _id: task._id,
+        title: task.title
+      };
+    }
+
+    // Get all instances
+    const instances = await Task.find({ parentTask: parentTaskId })
+      .select('_id title status dueDate instanceNumber')
+      .sort({ instanceNumber: 1 });
+    
+    preview.instancesCount = instances.length;
+
+    switch (editScope) {
+      case 'this_instance':
+        preview.affectedTasks = [task._id];
+        preview.affectedTasksCount = 1;
+        preview.description = task.parentTask
+          ? 'Only this specific instance will be modified. The recurring pattern will remain unchanged.'
+          : 'This occurrence will be modified and the recurring pattern will remain unchanged.';
+        break;
+        
+      case 'this_and_future':
+        if (task.parentTask) {
+          preview.affectedTasks = [task._id];
+          preview.affectedTasksCount = 1;
+          preview.description = 'This occurrence will be modified and the recurring pattern will be updated for future occurrences.';
+        } else {
+          preview.affectedTasks = [task._id];
+          preview.affectedTasksCount = 1;
+          preview.description = 'The recurring pattern will be updated, affecting all future occurrences.';
+        }
+        break;
+        
+      case 'all_instances':
+        preview.affectedTasks = [parentTaskId, ...instances.map(i => i._id)];
+        preview.affectedTasksCount = preview.affectedTasks.length;
+        preview.description = 'All occurrences (past, current, and future) will be modified.';
+        break;
+    }
+
+    return preview;
+  } catch (error) {
+    console.error('Error generating recurrence preview:', error);
+    throw error;
+  }
+}
+
+/**
+ * NEW: Track recurrence pattern changes
+ * @param {Object} task - The task being updated
+ * @param {Object} updateData - The update data
+ * @returns {Object} Change tracking information
+ */
+export function trackRecurrenceChanges(task, updateData) {
+  const changes = {
+    hasPatternChanges: false,
+    hasDurationChanges: false,
+    hasTimingChanges: false,
+    oldPattern: task.recurringPattern,
+    newPattern: updateData.recurringPattern,
+    oldDuration: task.duration,
+    newDuration: updateData.duration,
+    oldStartDate: task.startDate,
+    newStartDate: updateData.startDate
+  };
+
+  // Check for pattern changes
+  if (updateData.recurringPattern) {
+    changes.hasPatternChanges = true;
+  }
+
+  // Check for duration changes
+  if (updateData.duration) {
+    changes.hasDurationChanges = true;
+  }
+
+  // Check for timing changes
+  if (updateData.startDate && updateData.startDate !== task.startDate) {
+    changes.hasTimingChanges = true;
+  }
+
+  return changes;
+}
+
+/**
+ * ENHANCED: Handle recurring task editing with different scopes
  * @param {Object} task - The task being edited
  * @param {Object} updateData - The update data
  * @param {string} editScope - 'this_instance', 'this_and_future', or 'all_instances'
@@ -245,29 +466,23 @@ export async function handleRecurringTaskEdit(task, updateData, editScope, model
       break;
 
     case 'this_and_future':
-      // Update this and all future instances
+      // Update this and all future instances by updating the parent pattern
+      // and detaching the current instance from the series
       if (task.parentTask) {
-        // This is an instance, need to update the parent pattern
         const parentTask = await Task.findById(task.parentTask);
         if (parentTask) {
-          // Update the parent task's recurring pattern
+          // Apply non-recurring field updates to the parent for future instances
+          const parentUpdate = { ...updateData };
+          delete parentUpdate.isRecurring;
+          delete parentUpdate.recurringPattern;
+          Object.assign(parentTask, parentUpdate);
+
+          // If pattern is being updated, regenerate rrule and pattern fields
           if (updateData.recurringPattern) {
             const startDate = updateData.startDate || task.startDate || task.dueDate || new Date();
             const rruleString = patternToRRule(updateData.recurringPattern, startDate);
             parentTask.recurringPattern = rruleString;
-            
-            // Update other properties on parent
-            Object.assign(parentTask, {
-              title: updateData.title || parentTask.title,
-              description: updateData.description || parentTask.description,
-              priority: updateData.priority || parentTask.priority,
-              category: updateData.category || parentTask.category
-            });
-            
-            await parentTask.save();
-            result.updatedTasks.push(parentTask);
-            
-            // Update the recurring pattern
+
             const recurringPattern = await RecurringPattern.findOne({ task: parentTask._id });
             if (recurringPattern) {
               recurringPattern.rrule = rruleString;
@@ -276,24 +491,30 @@ export async function handleRecurringTaskEdit(task, updateData, editScope, model
               result.updatedPatterns.push(recurringPattern);
             }
           }
-          
-          // Update this instance
-          Object.assign(task, updateData);
+
+          await parentTask.save();
+          result.updatedTasks.push(parentTask);
+
+          // Detach and update this instance independently
+          const instanceUpdate = { ...updateData };
+          Object.assign(task, instanceUpdate);
           task.isRecurring = false;
           task.recurringPattern = null;
           await task.save();
           result.updatedTasks.push(task);
         }
       } else {
-        // This is the parent task, update it and its pattern
-        Object.assign(task, updateData);
-        
+        // Editing the parent: apply updates to parent so future instances inherit
+        const parentUpdate = { ...updateData };
+        delete parentUpdate.isRecurring;
+        // Keep recurring status on parent
+        Object.assign(task, parentUpdate);
+
         if (updateData.recurringPattern) {
           const startDate = updateData.startDate || task.startDate || task.dueDate || new Date();
           const rruleString = patternToRRule(updateData.recurringPattern, startDate);
           task.recurringPattern = rruleString;
-          
-          // Update the recurring pattern
+
           const recurringPattern = await RecurringPattern.findOne({ task: task._id });
           if (recurringPattern) {
             recurringPattern.rrule = rruleString;
@@ -302,7 +523,7 @@ export async function handleRecurringTaskEdit(task, updateData, editScope, model
             result.updatedPatterns.push(recurringPattern);
           }
         }
-        
+
         await task.save();
         result.updatedTasks.push(task);
       }

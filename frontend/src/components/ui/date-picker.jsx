@@ -204,7 +204,7 @@ export const DateTimePicker = forwardRef(function DateTimePicker({
                 disabled={disabled || !selectedDate}
                 placeholder="--:--"
                 className={cn(
-                  "pl-7 text-xs",
+                  "pl-7 text-xs w-auto",
                   error && "border-destructive focus:ring-destructive",
                   (!selectedDate || disabled) && "cursor-not-allowed opacity-50"
                 )}

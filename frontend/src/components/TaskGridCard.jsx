@@ -26,6 +26,7 @@ const TaskGridCard = ({
   task, 
   onEdit, 
   onDelete,
+  onStatusChange,
   className 
 }) => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -33,6 +34,10 @@ const TaskGridCard = ({
 
   const handleEdit = () => {
     onEdit?.(task);
+  };
+
+  const handleStatusChange = (newStatus) => {
+    onStatusChange?.(task._id, newStatus);
   };
 
   const handleDeleteClick = () => {
@@ -117,6 +122,28 @@ const TaskGridCard = ({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-40">
+            <DropdownMenuItem onClick={(e) => {
+              e.stopPropagation();
+              handleStatusChange('todo');
+            }} className="cursor-pointer text-xs">
+              <Circle className="h-3 w-3 mr-2" />
+              Mark as To Do
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={(e) => {
+              e.stopPropagation();
+              handleStatusChange('in_progress');
+            }} className="cursor-pointer text-xs">
+              <Play className="h-3 w-3 mr-2" />
+              Mark In Progress
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={(e) => {
+              e.stopPropagation();
+              handleStatusChange('done');
+            }} className="cursor-pointer text-xs">
+              <CheckCircle2 className="h-3 w-3 mr-2" />
+              Mark as Done
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
             <DropdownMenuItem onClick={(e) => {
               e.stopPropagation();
               handleEdit();

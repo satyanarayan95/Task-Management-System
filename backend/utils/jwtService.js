@@ -2,10 +2,10 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 
 // JWT configuration
-const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production';
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your-super-secret-refresh-key-change-in-production';
-const ACCESS_TOKEN_EXPIRY = process.env.ACCESS_TOKEN_EXPIRY || '1h'; // 1 hour
-const REFRESH_TOKEN_EXPIRY = process.env.REFRESH_TOKEN_EXPIRY || '7d'; // 7 days
+const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-jwt-key';
+const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'super-secret-refresh-key';
+const ACCESS_TOKEN_EXPIRY = process.env.ACCESS_TOKEN_EXPIRY || '15m'; 
+const REFRESH_TOKEN_EXPIRY = process.env.REFRESH_TOKEN_EXPIRY || '7d';
 
 // Generate access token
 export const generateAccessToken = (userId) => {
@@ -29,7 +29,7 @@ export const generateRefreshToken = (userId) => {
     { 
       userId,
       type: 'refresh',
-      jti: crypto.randomUUID() // JWT ID for token tracking
+      jti: crypto.randomUUID()
     },
     JWT_REFRESH_SECRET,
     { 

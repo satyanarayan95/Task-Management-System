@@ -251,6 +251,19 @@ const TaskTable = ({
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-48">
+                      <DropdownMenuItem onClick={() => handleStatusChange(task._id, 'todo')} className="cursor-pointer">
+                        <Circle className="h-4 w-4 mr-2" />
+                        Mark as To Do
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleStatusChange(task._id, 'in_progress')} className="cursor-pointer">
+                        <Play className="h-4 w-4 mr-2" />
+                        Mark In Progress
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleStatusChange(task._id, 'done')} className="cursor-pointer">
+                        <CheckCircle2 className="h-4 w-4 mr-2" />
+                        Mark as Done
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={() => handleEdit(task)} className="cursor-pointer">
                         <Edit3 className="h-4 w-4 mr-2" />
                         Edit Task

@@ -70,7 +70,7 @@ const NotificationTray = () => {
     }
 
     if (notification.relatedTask) {
-      navigate(`/tasks?task=${notification.relatedTask}`)
+      navigate(`/tasks/${notification.relatedTask._id}`)
     }
   }
 
@@ -177,51 +177,7 @@ const NotificationTray = () => {
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      {!notification.isRead && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => handleMarkAsRead(e, notification._id)}
-                          disabled={isLoading}
-                          className="h-5 w-5 p-0"
-                        >
-                          <Check className="h-3 w-3" />
-                        </Button>
-                      )}
-
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            disabled={isLoading}
-                            className="h-5 w-5 p-0"
-                          >
-                            <MoreHorizontal className="h-3 w-3" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          {!notification.isRead && (
-                            <DropdownMenuItem
-                              onClick={(e) => handleMarkAsRead(e, notification._id)}
-                              disabled={isLoading}
-                            >
-                              <Check className="h-4 w-4 mr-2" />
-                              Mark as read
-                            </DropdownMenuItem>
-                          )}
-                          <DropdownMenuItem
-                            onClick={(e) => handleDeleteNotification(e, notification._id)}
-                            disabled={isLoading}
-                            className="text-destructive focus:text-destructive"
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
+                    <div className="flex items-center gap-1" />
                   </div>
 
                   {!notification.isRead && (

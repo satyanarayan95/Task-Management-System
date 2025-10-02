@@ -23,7 +23,7 @@ import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Check, ChevronsUpDown, X, User } from 'lucide-react';
 import UserAvatar from './UserAvatar';
-import { taskAPI } from '../lib/api';
+import { authAPI } from '../lib/api';
 import { cn } from '../lib/utils';
 
 const UserSelector = ({ 
@@ -41,7 +41,7 @@ const UserSelector = ({
     const fetchUsers = async () => {
       try {
         setLoading(true);
-        const response = await taskAPI.getUsers();
+        const response = await authAPI.getUsers();
         if (response.success) {
           setUsers(response.data);
         }

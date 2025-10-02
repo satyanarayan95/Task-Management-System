@@ -15,6 +15,7 @@ import { Button } from './ui/button';
 import { Skeleton } from './ui/skeleton';
 import { Card, CardContent, CardHeader } from './ui/card';
 import { taskAPI } from '../lib/api';
+import { taskToast } from '../lib/toast';
 import { cn } from '../lib/utils';
 import {
   recentSearchManager,
@@ -219,6 +220,7 @@ const TaskList = ({ className, searchTerm: externalSearchTerm = '', searchResetK
         throw new Error(response.error.message);
       }
       fetchTasks(currentPage, pageSize, searchTerm, filters, sortBy, sortOrder);
+      taskToast.statusChanged(newStatus);
     } catch (err) {
       console.error('Error updating task status:', err);
       setError(err.message || 'Failed to update task status');
@@ -258,6 +260,7 @@ const TaskList = ({ className, searchTerm: externalSearchTerm = '', searchResetK
         throw new Error(response.error.message);
       }
       fetchTasks(currentPage, pageSize, searchTerm, filters, sortBy, sortOrder);
+      taskToast.deleted();
     } catch (err) {
       console.error('Error deleting task:', err);
       setError(err.message || 'Failed to delete task');

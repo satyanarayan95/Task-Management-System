@@ -1,26 +1,19 @@
 import axios from 'axios'
 import { useAuthStore } from '../stores'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5500/api'
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api'
 const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true,
 })
 
 api.interceptors.request.use(
   async (config) => {
     const { accessToken, needsTokenRefresh, refreshAccessToken, isRefreshing } = useAuthStore.getState()
-
-    if (config.url === '/tasks' && config.method === 'post') {
-      console.log('=== AXIOS TASK CREATION REQUEST ===');
-      console.log('URL:', config.baseURL + config.url);
-      console.log('Headers:', config.headers);
-      console.log('Data:', JSON.stringify(config.data, null, 2));
-    }
-
     if (accessToken) {
       if (!isRefreshing && needsTokenRefresh()) {
         try {
@@ -116,9 +109,9 @@ export const handleApiError = (error) => {
 }
 
 export const authAPI = {
-  login: async (credentials) => {
+  login: async (email,password) => {
     try {
-      const response = await api.post('/auth/login', credentials)
+      const response = await api.post('/auth/login', { email, password })
       return { success: true, data: response.data }
     } catch (error) {
       return { success: false, error: handleApiError(error) }
@@ -134,18 +127,28 @@ export const authAPI = {
     }
   },
 
-  logout: async () => {
+  logout: async (refreshToken) => {
     try {
-      await api.post('/auth/logout')
+      await api.post('/auth/logout', { refreshToken })
       return { success: true }
     } catch (error) {
       return { success: false, error: handleApiError(error) }
     }
   },
 
-  refreshToken: async () => {
+  logoutAll: async (refreshToken) => {
     try {
-      const response = await api.post('/auth/refresh')
+      await api.post('/auth/logout-all', { refreshToken })
+      return { success: true }
+    } catch (error) {
+      return { success: false, error: handleApiError(error) }
+    }
+  },
+
+  refreshToken: async (refreshToken) => {
+    try {
+      const payload = refreshToken ? { refreshToken } : {}
+      const response = await api.post('/auth/refresh', payload)
       return { success: true, data: response.data }
     } catch (error) {
       return { success: false, error: handleApiError(error) }
@@ -164,6 +167,16 @@ export const authAPI = {
   updateProfile: async (userData) => {
     try {
       const response = await api.put('/auth/profile', userData)
+      return { success: true, data: response.data }
+    } catch (error) {
+      return { success: false, error: handleApiError(error) }
+    }
+  },
+  
+  getUsers: async (search = '') => {
+    try {
+      const params = search ? { search } : {};
+      const response = await api.get('/users', { params })
       return { success: true, data: response.data }
     } catch (error) {
       return { success: false, error: handleApiError(error) }
@@ -243,7 +256,7 @@ export const taskAPI = {
       if (recurringScope) {
         data.recurringScope = recurringScope;
       }
-      const response = await api.patch(`/tasks/${id}/status`, data)
+      const response = await api.put(`/tasks/${id}/status`, data)
       return { success: true, data: response.data }
     } catch (error) {
       return { success: false, error: handleApiError(error) }
@@ -277,15 +290,6 @@ export const taskAPI = {
     }
   },
 
-  getUsers: async (search = '') => {
-    try {
-      const params = search ? { search } : {};
-      const response = await api.get('/users', { params })
-      return { success: true, data: response.data }
-    } catch (error) {
-      return { success: false, error: handleApiError(error) }
-    }
-  },
 
   getActivities: async (params = {}) => {
     try {
@@ -299,60 +303,6 @@ export const taskAPI = {
   getTaskActivities: async (taskId, params = {}) => {
     try {
       const response = await api.get(`/activities/task/${taskId}`, { params })
-      return { success: true, data: response.data }
-    } catch (error) {
-      return { success: false, error: handleApiError(error) }
-    }
-  },
-
-  login: async (email, password) => {
-    try {
-      const response = await api.post('/auth/login', { email, password })
-      return { success: true, data: response.data }
-    } catch (error) {
-      return { success: false, error: handleApiError(error) }
-    }
-  },
-
-  register: async (userData) => {
-    try {
-      const response = await api.post('/auth/register', userData)
-      return { success: true, data: response.data }
-    } catch (error) {
-      return { success: false, error: handleApiError(error) }
-    }
-  },
-
-  logout: async () => {
-    try {
-      const response = await api.post('/auth/logout')
-      return { success: true, data: response.data }
-    } catch (error) {
-      return { success: false, error: handleApiError(error) }
-    }
-  },
-
-  logoutAll: async () => {
-    try {
-      const response = await api.post('/auth/logout-all')
-      return { success: true, data: response.data }
-    } catch (error) {
-      return { success: false, error: handleApiError(error) }
-    }
-  },
-
-  refreshToken: async (refreshToken) => {
-    try {
-      const response = await api.post('/auth/refresh', { refreshToken })
-      return { success: true, data: response.data }
-    } catch (error) {
-      return { success: false, error: handleApiError(error) }
-    }
-  },
-
-  getProfile: async () => {
-    try {
-      const response = await api.get('/auth/profile')
       return { success: true, data: response.data }
     } catch (error) {
       return { success: false, error: handleApiError(error) }

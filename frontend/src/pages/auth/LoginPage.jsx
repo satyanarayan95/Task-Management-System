@@ -7,7 +7,7 @@ import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
 import { Alert, AlertDescription } from '../../components/ui/alert'
 import { useAuthStore } from '../../stores'
-import { taskAPI } from '../../lib/api'
+import { authAPI } from '../../lib/api'
 import { userValidation } from '../../lib/validation'
 import { toast } from '../../lib/toast'
 
@@ -48,11 +48,11 @@ const LoginPage = () => {
     setGeneralError('')
 
     try {
-      const result = await taskAPI.login(formData.email, formData.password)
+      const result = await authAPI.login(formData.email, formData.password)
       
       if (result.success) {
-        const { user, accessToken, refreshToken } = result.data
-        login(user, accessToken, refreshToken)
+        const { user, accessToken } = result.data
+        login(user, accessToken)
         toast.success(`Welcome back, ${user.fullName}!`)
         navigate('/dashboard')
       } else {

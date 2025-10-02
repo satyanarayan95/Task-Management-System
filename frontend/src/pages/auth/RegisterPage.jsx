@@ -8,7 +8,7 @@ import { Label } from '../../components/ui/label'
 import { Alert, AlertDescription } from '../../components/ui/alert'
 import { Progress } from '../../components/ui/progress'
 import { useAuthStore } from '../../stores'
-import { taskAPI } from '../../lib/api'
+import { authAPI } from '../../lib/api'
 import { userValidation } from '../../lib/validation'
 import { toast } from '../../lib/toast'
 
@@ -68,11 +68,11 @@ const RegisterPage = () => {
     setGeneralError('')
 
     try {
-      const result = await taskAPI.register(formData)
+      const result = await authAPI.register(formData)
       
       if (result.success) {
-        const { user, accessToken, refreshToken } = result.data
-        login(user, accessToken, refreshToken)
+        const { user, accessToken } = result.data
+        login(user, accessToken)
         toast.success('Welcome to TaskFlow! Your account has been created successfully.')
         navigate('/dashboard')
       } else {

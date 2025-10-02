@@ -12,17 +12,17 @@ import {
   logPriorityChangeActivity,
   logDueDateChangeActivity
 } from '../utils/activityService.js';
-import { 
-  taskCreateSchema, 
-  taskUpdateSchema, 
+import {
+  taskCreateSchema,
+  taskUpdateSchema,
   taskStatusUpdateSchema
 } from '../../shared/schemas/task.js';
-import { patternToRRule, getNextOccurrence } from '../utils/recurringTasks.js';
+import { patternToRRule, getNextOccurrence, calculateDueDate } from '../utils/recurringTasks.js';
+import { calculateDuration } from '../../shared/utils/durationUtils.js';
 import NotificationService from '../utils/notificationService.js';
 
 const router = express.Router();
 
-// Apply authentication to all routes
 router.use(authenticateToken);
 
 // GET /api/tasks - Get all tasks for authenticated user
@@ -42,7 +42,6 @@ router.get('/', async (req, res) => {
       limit = 20
     } = req.query;
     
-    // Build query for tasks user owns or is assigned to
     const query = {
       $or: [
         { owner: req.user._id },
@@ -50,9 +49,8 @@ router.get('/', async (req, res) => {
       ]
     };
     
-    // Add search functionality
     if (search && search.trim()) {
-      const searchRegex = new RegExp(search.trim(), 'i'); // Case-insensitive search
+      const searchRegex = new RegExp(search.trim(), 'i');
       query.$and = query.$and || [];
       query.$and.push({
         $or: [
@@ -62,7 +60,6 @@ router.get('/', async (req, res) => {
       });
     }
     
-    // Add filters (handle both single values and arrays)
     if (status) {
       const statusFilters = Array.isArray(status) ? status : [status];
       query.status = { $in: statusFilters };
@@ -77,14 +74,12 @@ router.get('/', async (req, res) => {
     }
     if (assignees) {
       const assigneeFilters = Array.isArray(assignees) ? assignees : [assignees];
-      // Filter by assignees
       query.$and = query.$and || [];
       query.$and.push({
         assignees: { $in: assigneeFilters }
       });
     }
     
-    // Add due date filters
     if (dueDateFrom || dueDateTo) {
       query.dueDate = {};
       if (dueDateFrom) {
@@ -142,15 +137,11 @@ router.get('/', async (req, res) => {
     const sort = {};
     sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
     
-    // Parse pagination parameters
     const pageNum = Math.max(1, parseInt(page));
-    const limitNum = Math.min(100, Math.max(1, parseInt(limit))); // Max 100 items per page
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
     const skip = (pageNum - 1) * limitNum;
-    
-    // Get total count for pagination metadata
     const totalTasks = await Task.countDocuments(query);
     
-    // Fetch tasks with pagination
     const tasks = await Task.find(query)
       .populate('category', 'name color')
       .populate('owner', 'fullName email')
@@ -223,25 +214,9 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// POST /api/tasks - Create new task
+// ENHANCED: POST /api/tasks - Create new task
 router.post('/', async (req, res) => {
   try {
-    console.log('=== TASK CREATION REQUEST ===');
-    console.log('Request body:', JSON.stringify(req.body, null, 2));
-    console.log('User ID:', req.user._id);
-    console.log('Headers:', JSON.stringify(req.headers, null, 2));
-    
-    // Log specific fields that might cause issues
-    console.log('=== FIELD ANALYSIS ===');
-    console.log('Title:', req.body.title, 'Type:', typeof req.body.title);
-    console.log('Description:', req.body.description, 'Type:', typeof req.body.description);
-    console.log('Status:', req.body.status, 'Type:', typeof req.body.status);
-    console.log('Priority:', req.body.priority, 'Type:', typeof req.body.priority);
-    console.log('Category:', req.body.category, 'Type:', typeof req.body.category);
-    console.log('Assignees:', req.body.assignees, 'Type:', typeof req.body.assignees, 'Is Array:', Array.isArray(req.body.assignees));
-    console.log('Due Date:', req.body.dueDate, 'Type:', typeof req.body.dueDate);
-    console.log('Start Date:', req.body.startDate, 'Type:', typeof req.body.startDate);
-    
     // Validate request body
     const validatedData = taskCreateSchema.parse(req.body);
     console.log('Validated data:', JSON.stringify(validatedData, null, 2));
@@ -276,43 +251,56 @@ router.post('/', async (req, res) => {
       }
     }
     
-    // Convert date strings to Date objects
+    // Handle duration and due date logic
     const taskData = {
       ...validatedData,
       owner: req.user._id,
       assignees: assigneeIds,
       category: validatedData.category && validatedData.category.trim() !== '' ? validatedData.category : undefined
     };
-    
+
     if (validatedData.startDate) {
       taskData.startDate = new Date(validatedData.startDate);
+    } else {
+      taskData.startDate = new Date();
     }
-    
-    if (validatedData.dueDate) {
+
+    if (validatedData.duration) {
+      taskData.duration = validatedData.duration;
+      taskData.dueDate = calculateDueDate(taskData.startDate, validatedData.duration);
+    } else if (validatedData.dueDate) {
       taskData.dueDate = new Date(validatedData.dueDate);
+      taskData.duration = calculateDuration(taskData.startDate, taskData.dueDate);
     }
     
     // Validate date logic
-    if (taskData.startDate && taskData.dueDate && taskData.startDate > taskData.dueDate) {
-      return res.status(400).json({ error: 'Start date cannot be after due date' });
+    if (taskData.startDate && taskData.dueDate && taskData.startDate >= taskData.dueDate) {
+      return res.status(400).json({ error: 'Start date must be before due date' });
     }
     
     // Handle recurring tasks
     if (validatedData.isRecurring && validatedData.recurringPattern) {
       try {
+        // Validate that duration is provided for recurring tasks
+        if (!validatedData.duration) {
+          return res.status(400).json({ error: 'Duration is required for recurring tasks' });
+        }
+        
         // Convert pattern to RRule string
-        const startDate = taskData.startDate || taskData.dueDate || new Date();
-        const rruleString = patternToRRule(validatedData.recurringPattern, startDate);
-        taskData.recurringPattern = rruleString;
+        const rruleString = patternToRRule(validatedData.recurringPattern, taskData.startDate);
+        taskData.recurringPattern = validatedData.recurringPattern;
         
         // Calculate next occurrence for the recurring pattern
-        const nextOccurrence = getNextOccurrence(rruleString, startDate);
+        const nextOccurrence = getNextOccurrence(rruleString, taskData.startDate);
         if (!nextOccurrence) {
           return res.status(400).json({ error: 'Invalid recurring pattern - no future occurrences' });
         }
+        
+        taskData.recurrenceVersion = 1;
+        taskData.lastRecurrenceUpdate = new Date();
       } catch (rruleError) {
         console.error('RRule error:', rruleError);
-        return res.status(400).json({ error: 'Invalid recurring pattern configuration' });
+        return res.status(400).json({ error: 'Invalid recurring pattern configuration: ' + rruleError.message });
       }
     }
     
@@ -321,14 +309,19 @@ router.post('/', async (req, res) => {
     
     // Create RecurringPattern record if this is a recurring task
     if (task.isRecurring && task.recurringPattern) {
-      const startDate = task.startDate || task.dueDate || new Date();
-      const nextOccurrence = getNextOccurrence(task.recurringPattern, startDate);
+      const rruleString = patternToRRule(task.recurringPattern, task.startDate);
+      const nextOccurrence = getNextOccurrence(rruleString, task.startDate);
       
       const recurringPattern = new RecurringPattern({
         task: task._id,
-        rrule: task.recurringPattern,
+        rrule: rruleString,
+        instanceDuration: task.duration,
+        timezone: task.recurringPattern.timezone || 'UTC',
         nextDue: nextOccurrence,
-        lastGenerated: new Date()
+        lastGenerated: new Date(),
+        patternVersion: 1,
+        endDate: task.recurringPattern.endDate ? new Date(task.recurringPattern.endDate) : null,
+        endOccurrences: task.recurringPattern.endOccurrences || null
       });
       
       await recurringPattern.save();
@@ -456,7 +449,6 @@ router.put('/:id', async (req, res) => {
       return res.status(400).json({ error: 'Invalid task ID' });
     }
     
-    // Validate request body
     const validatedData = taskUpdateSchema.parse(req.body);
     
     const task = await Task.findById(id);
@@ -465,7 +457,6 @@ router.put('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Task not found' });
     }
     
-    // Check if user has edit access
     if (!task.hasAccess(req.user._id, 'edit')) {
       return res.status(403).json({ error: 'Edit access denied' });
     }
@@ -486,38 +477,127 @@ router.put('/:id', async (req, res) => {
       }
     }
     
-    // Prepare update data
+    // Prepare update data with duration handling
     const updateData = { ...validatedData };
+    const currentStartDate = task.startDate || new Date();
     
     if (validatedData.startDate) {
       updateData.startDate = new Date(validatedData.startDate);
     }
     
-    if (validatedData.dueDate) {
+    // Handle duration vs due date logic
+    if (validatedData.duration) {
+      updateData.duration = validatedData.duration;
+      const startDate = updateData.startDate || currentStartDate;
+      updateData.dueDate = calculateDueDate(startDate, validatedData.duration);
+    } else if (validatedData.dueDate) {
       updateData.dueDate = new Date(validatedData.dueDate);
+      if (!validatedData.duration) {
+        const startDate = updateData.startDate || currentStartDate;
+        updateData.duration = calculateDuration(startDate, updateData.dueDate);
+      }
+    } else if (validatedData.startDate && task.duration) {
+      updateData.dueDate = calculateDueDate(updateData.startDate, task.duration);
     }
     
-    // Validate date logic if both dates are being updated
+    // Validate date logic
     const newStartDate = updateData.startDate || task.startDate;
     const newDueDate = updateData.dueDate || task.dueDate;
     
-    if (newStartDate && newDueDate && newStartDate > newDueDate) {
-      return res.status(400).json({ error: 'Start date cannot be after due date' });
+    if (newStartDate && newDueDate && newStartDate >= newDueDate) {
+      return res.status(400).json({ error: 'Start date must be before due date' });
+    }
+    if (validatedData.isRecurring === true && !validatedData.duration && !task.duration) {
+      return res.status(400).json({ error: 'Duration is required for recurring tasks' });
+    }
+    if (validatedData.isRecurring && validatedData.recurringPattern) {
+      const pattern = validatedData.recurringPattern;
+
+      if (pattern.frequency === 'weekly' && (!pattern.daysOfWeek || pattern.daysOfWeek.length === 0)) {
+        return res.status(400).json({ error: 'Weekly recurrence must specify days of week' });
+      }
+
+      if (pattern.frequency === 'monthly' && !pattern.dayOfMonth) {
+        return res.status(400).json({ error: 'Monthly recurrence must specify day of month' });
+      }
+
+      if (pattern.endDate && pattern.endOccurrences) {
+        return res.status(400).json({ error: 'Cannot specify both end date and end occurrences' });
+      }
+
+      if (pattern.endDate) {
+        const startDate = newStartDate || currentStartDate;
+        const endDate = new Date(pattern.endDate);
+        if (startDate >= endDate) {
+          return res.status(400).json({ error: 'End date must be after start date' });
+        }
+      }
     }
     
+    // Enforce assignee modification permissions:
+    // - Only the owner can change the assignees list
+    // - Assignees may only self-unassign (remove their own ID), not add or remove others
+    if (Array.isArray(updateData.assignees)) {
+      const isOwner = task.owner.toString() === req.user._id.toString();
+      if (!isOwner) {
+        // Compare requested assignees vs current
+        const currentSet = new Set(task.assignees.map(a => a.toString()));
+        const requestedSet = new Set(updateData.assignees.map(a => a.toString()));
+
+        // Determine additions and removals
+        const additions = updateData.assignees.filter(id => !currentSet.has(id.toString()));
+        const removals = task.assignees.filter(id => !requestedSet.has(id.toString()));
+
+        // Allow only self removal and no additions
+        const onlySelfRemoval =
+          additions.length === 0 &&
+          removals.every(id => id.toString() === req.user._id.toString());
+
+        if (!onlySelfRemoval) {
+          return res.status(403).json({ error: 'Only the owner can modify assignees. Assignees may only remove themselves.' });
+        }
+      }
+    }
+
     // Handle recurring task updates
-    if (task.isRecurring || updateData.isRecurring) {
+    const isRecurringTask = task.isRecurring || updateData.isRecurring;
+    const isEditingRecurring = isRecurringTask && validatedData.editScope;
+    
+    if (isEditingRecurring) {
       const editScope = validatedData.editScope || 'this_instance';
       
       try {
-        // Import the utility function
-        const { handleRecurringTaskEdit } = await import('../utils/recurringTasks.js');
+        const { handleRecurringTaskEdit, trackRecurrenceChanges } = await import('../utils/recurringTasks.js');
+        
+        const changes = trackRecurrenceChanges(task, updateData);
+        
+        if (changes.hasPatternChanges || changes.hasDurationChanges || changes.hasTimingChanges) {
+          updateData.recurrenceVersion = (task.recurrenceVersion || 1) + 1;
+          updateData.lastRecurrenceUpdate = new Date();
+          
+          if (updateData.recurringPattern) {
+            const startDate = updateData.startDate || task.startDate || new Date();
+            const rruleString = patternToRRule(updateData.recurringPattern, startDate);
+            await RecurringPattern.updateOne(
+              { task: task._id },
+              {
+                rrule: rruleString,
+                instanceDuration: updateData.duration || task.duration,
+                timezone: updateData.recurringPattern.timezone || 'UTC',
+                patternVersion: updateData.recurrenceVersion,
+                endDate: updateData.recurringPattern.endDate ? new Date(updateData.recurringPattern.endDate) : null,
+                endOccurrences: updateData.recurringPattern.endOccurrences || null,
+                nextDue: getNextOccurrence(rruleString, startDate)
+              }
+            );
+          }
+        }
         
         // Handle the recurring task edit with the specified scope
         const editResult = await handleRecurringTaskEdit(
-          task, 
-          updateData, 
-          editScope, 
+          task,
+          updateData,
+          editScope,
           { Task, RecurringPattern }
         );
         
@@ -526,6 +606,7 @@ router.put('/:id', async (req, res) => {
           const newInstance = editResult.createdTasks[0];
           await newInstance.populate('category', 'name color');
           await newInstance.populate('owner', 'fullName email');
+          await newInstance.populate('assignees', 'fullName email');
           
           const taskObj = newInstance.toObject();
           taskObj.userPermission = newInstance.getUserPermission(req.user._id);
@@ -537,6 +618,7 @@ router.put('/:id', async (req, res) => {
         // Reload the task to get the latest data
         await task.populate('category', 'name color');
         await task.populate('owner', 'fullName email');
+        await task.populate('assignees', 'fullName email');
         
         const taskObj = task.toObject();
         taskObj.userPermission = task.getUserPermission(req.user._id);
@@ -549,14 +631,68 @@ router.put('/:id', async (req, res) => {
       }
     }
     
-    // Track changes for activity logging
+    // Track changes for activity logging and notifications
     const oldPriority = task.priority;
     const oldDueDate = task.dueDate;
+    const oldStatus = task.status;
+    const originalAssigneeIds = (task.assignees || []).map(a => a.toString());
     
     // Update the task
     Object.assign(task, updateData);
     await task.save();
+    await task.populate('assignees', 'fullName email');
     
+    // Log status change activity
+    if (oldStatus !== task.status) {
+      await logStatusChangeActivity(
+        req.user._id,
+        task._id,
+        oldStatus,
+        task.status,
+        `Changed task status from "${oldStatus}" to "${task.status}"`,
+        { taskTitle: task.title }
+      );
+    }
+
+    // Notifications for assignment changes
+    if (Array.isArray(updateData.assignees)) {
+      const updatedAssigneeIds = (task.assignees || []).map(u => u._id?.toString?.() || u.toString());
+      const addedAssigneeIds = updatedAssigneeIds.filter(id => !originalAssigneeIds.includes(id));
+      const removedAssigneeIds = originalAssigneeIds.filter(id => !updatedAssigneeIds.includes(id));
+
+      // Notify newly added assignees (reuse existing helper)
+      if (addedAssigneeIds.length > 0) {
+        try {
+          await Promise.all(
+            addedAssigneeIds.map(async userId => {
+              const user = await User.findById(userId);
+              if (user && user._id.toString() !== req.user._id.toString()) {
+                return NotificationService.createTaskAssignmentNotification(task, user, req.user);
+              }
+            })
+          );
+        } catch (e) {
+          console.error('Error creating assignment notifications on update:', e);
+        }
+      }
+
+      // Notify users who were removed
+      if (removedAssigneeIds.length > 0) {
+        try {
+          await Promise.all(
+            removedAssigneeIds.map(async userId => {
+              const user = await User.findById(userId);
+              if (user && user._id.toString() !== req.user._id.toString()) {
+                return NotificationService.createTaskUnassignedNotification(task, user, req.user);
+              }
+            })
+          );
+        } catch (e) {
+          console.error('Error creating unassignment notifications:', e);
+        }
+      }
+    }
+
     // Log specific activity types for important changes
     if (oldPriority !== task.priority) {
       await logPriorityChangeActivity(
@@ -569,6 +705,40 @@ router.put('/:id', async (req, res) => {
       );
     }
     
+    // Notifications for status change
+    if (oldStatus !== task.status) {
+      try {
+        const recipients = (task.assignees || [])
+          .filter(u => u._id.toString() !== req.user._id.toString());
+        await Promise.all(
+          recipients.map(user =>
+            NotificationService.createTaskStatusChangeNotification(
+              task, user, req.user, oldStatus, task.status
+            )
+          )
+        );
+      } catch (e) {
+        console.error('Error creating status change notifications:', e);
+      }
+    }
+
+    // Notifications for priority change
+    if (oldPriority !== task.priority) {
+      try {
+        const recipients = (task.assignees || [])
+          .filter(u => u._id.toString() !== req.user._id.toString());
+        await Promise.all(
+          recipients.map(user =>
+            NotificationService.createTaskPriorityChangeNotification(
+              task, user, req.user, oldPriority, task.priority
+            )
+          )
+        );
+      } catch (e) {
+        console.error('Error creating priority change notifications:', e);
+      }
+    }
+
     if (oldDueDate?.getTime() !== task.dueDate?.getTime()) {
       await logDueDateChangeActivity(
         req.user._id,
@@ -640,6 +810,7 @@ router.put('/:id/status', async (req, res) => {
     const oldStatus = task.status;
     task.status = status;
     await task.save();
+    await task.populate('assignees', 'fullName email');
     
     // Log status change activity
     await logStatusChangeActivity(
@@ -650,6 +821,20 @@ router.put('/:id/status', async (req, res) => {
       `Changed task status from "${oldStatus}" to "${status}"`,
       { taskTitle: task.title }
     );
+
+    try {
+      const recipients = (task.assignees || [])
+        .filter(u => u._id.toString() !== req.user._id.toString());
+      await Promise.all(
+        recipients.map(user =>
+          NotificationService.createTaskStatusChangeNotification(
+            task, user, req.user, oldStatus, status
+          )
+        )
+      );
+    } catch (e) {
+      console.error('Error creating status change notifications:', e);
+    }
     
     // Populate the updated task
     await task.populate('category', 'name color');

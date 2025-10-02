@@ -5,7 +5,8 @@ import { authenticateToken } from '../middleware/auth.js';
 import { 
   generateTokenPair, 
   verifyRefreshToken,
-  generateAccessToken 
+  generateAccessToken,
+  generateRefreshToken 
 } from '../utils/jwtService.js';
 import { 
   userRegistrationSchema, 
@@ -44,16 +45,26 @@ router.post('/register', async (req, res) => {
     const { accessToken, refreshToken } = generateTokenPair(user._id);
     
     // Store refresh token
-    await user.addRefreshToken(refreshToken);
+    const ua = req.get('user-agent') || '';
+    const ip = req.ip;
+    const decoded = verifyRefreshToken(refreshToken);
+    await user.addRefreshToken(refreshToken, { jti: decoded.jti, userAgent: ua, ip });
     
     // Update last login
     user.lastLogin = new Date();
     await user.save();
     
+    // Set refresh token as httpOnly cookie
+    res.cookie('refreshToken', refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000
+    });
+
     res.status(201).json({
       message: 'User registered successfully',
       accessToken,
-      refreshToken,
       user: user.toJSON()
     });
     
@@ -98,16 +109,24 @@ router.post('/login', async (req, res) => {
     const { accessToken, refreshToken } = generateTokenPair(user._id);
     
     // Store refresh token
-    await user.addRefreshToken(refreshToken);
+    const ua = req.get('user-agent') || '';
+    const ip = req.ip;
+    const decoded = verifyRefreshToken(refreshToken);
+    await user.addRefreshToken(refreshToken, { jti: decoded.jti, userAgent: ua, ip });
     
     // Update last login
     user.lastLogin = new Date();
     await user.save();
-    
+    res.cookie('refreshToken', refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000
+    });
+
     res.json({
       message: 'Login successful',
       accessToken,
-      refreshToken,
       user: user.toJSON()
     });
     
@@ -127,15 +146,20 @@ router.post('/login', async (req, res) => {
 // POST /api/auth/logout
 router.post('/logout', authenticateToken, async (req, res) => {
   try {
-    // Reload user with refreshTokens field to avoid version conflicts
+    const refreshToken = req.cookies?.refreshToken || req.body.refreshToken;
+    if (!refreshToken) {
+      return res.status(400).json({ error: 'Refresh token required to logout this device' });
+    }
+
     const user = await User.findById(req.user._id);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
     
-    // Remove all refresh tokens for the user
-    await user.removeAllRefreshTokens();
+    await user.removeRefreshToken(refreshToken);
     
+    // Clear cookie
+    res.clearCookie('refreshToken');
     res.json({ message: 'Logout successful' });
   } catch (error) {
     console.error('Logout error:', error);
@@ -165,7 +189,7 @@ router.post('/logout-all', authenticateToken, async (req, res) => {
 // POST /api/auth/refresh
 router.post('/refresh', async (req, res) => {
   try {
-    const { refreshToken } = req.body;
+    const refreshToken = req.cookies?.refreshToken || req.body.refreshToken;
 
     if (!refreshToken) {
       return res.status(401).json({ 
@@ -195,6 +219,19 @@ router.post('/refresh', async (req, res) => {
 
     // Generate new access token
     const newAccessToken = generateAccessToken(user._id);
+    const newRefreshToken = generateRefreshToken(user._id);
+    const ua = req.get('user-agent') || '';
+    const ip = req.ip;
+    const decodedNew = verifyRefreshToken(newRefreshToken);
+    await user.addRefreshToken(newRefreshToken, { jti: decodedNew.jti, userAgent: ua, ip });
+    await user.removeRefreshToken(refreshToken);
+
+    res.cookie('refreshToken', newRefreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000
+    });
 
     res.json({
       message: 'Token refreshed successfully',
