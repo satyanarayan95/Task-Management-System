@@ -13,7 +13,7 @@ const taskPrioritySchema = z.enum(['low', 'medium', 'high', 'urgent'], {
 // Task permission enum for sharing
 const taskPermissionSchema = z.enum(['view', 'edit']);
 
-// NEW: Duration schema with validation
+//  Duration schema with validation
 const durationSchema = z.object({
   years: z.number().min(0, 'Years cannot be negative').max(99, 'Years cannot exceed 99').default(0),
   months: z.number().min(0, 'Months cannot be negative').max(11, 'Months cannot exceed 11').default(0),
@@ -29,7 +29,7 @@ const durationSchema = z.object({
   path: ["duration"]
 });
 
-// ENHANCED: Recurring pattern validation
+//  Recurring pattern validation
 const recurringPatternSchema = z.object({
   frequency: z.enum(['daily', 'weekly', 'monthly', 'yearly'], {
     errorMap: () => ({ message: 'Please select a valid frequency' })
@@ -69,7 +69,7 @@ const recurringPatternSchema = z.object({
   path: ["recurringPattern"]
 });
 
-// ENHANCED: Task creation schema
+//  Task creation schema
 const taskCreateSchema = z.object({
   title: z.string()
     .min(1, 'Title is required')
@@ -89,7 +89,7 @@ const taskCreateSchema = z.object({
     .datetime('Please enter a valid start date and time')
     .optional(),
   
-  // NEW: Either duration or dueDate (for backward compatibility)
+  //  Either duration or dueDate (for backward compatibility)
   duration: durationSchema.optional(),
   dueDate: z.string()
     .datetime('Please enter a valid due date and time')
@@ -142,7 +142,7 @@ const taskCreateSchema = z.object({
   path: ["timing"]
 });
 
-// ENHANCED: Task update schema
+//  Task update schema
 const taskUpdateSchema = z.object({
   title: z.string()
     .min(1, 'Title is required')
@@ -163,7 +163,7 @@ const taskUpdateSchema = z.object({
     .datetime('Please enter a valid start date and time')
     .optional(),
   
-  // NEW: Either duration or dueDate (for backward compatibility)
+  //  Either duration or dueDate (for backward compatibility)
   duration: durationSchema.optional(),
   dueDate: z.string()
     .datetime('Please enter a valid due date and time')

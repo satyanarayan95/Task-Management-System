@@ -214,7 +214,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// ENHANCED: POST /api/tasks - Create new task
+//  POST /api/tasks - Create new task
 router.post('/', async (req, res) => {
   try {
     // Validate request body

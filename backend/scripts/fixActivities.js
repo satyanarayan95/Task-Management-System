@@ -27,7 +27,7 @@ const fixActivities = async () => {
           const newDescription = `Assigned task "${taskTitle}" to ${userName}`;
           
           console.log(`  Old: ${activity.description}`);
-          console.log(`  New: ${newDescription}`);
+          console.log(`   ${newDescription}`);
           
           activity.description = newDescription;
           await activity.save();

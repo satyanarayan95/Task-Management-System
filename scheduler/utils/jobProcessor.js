@@ -1,5 +1,5 @@
-import { Task, Notification, RecurringPattern, User } from '../models/index.js';
-import { getNextOccurrence, validateRRule, hasMoreOccurrences } from './rruleHelper.js';
+import { Task, Notification, RecurringPattern } from '../models/index.js';
+import { getNextOccurrence } from './rruleHelper.js';
 
 class JobProcessor {
   constructor(redisClient) {

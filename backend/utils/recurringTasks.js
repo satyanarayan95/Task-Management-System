@@ -3,7 +3,7 @@ const { RRule } = pkg;
 import { addToDate, calculateDuration as calculateDurationFromDates } from '../../shared/utils/durationUtils.js';
 
 /**
- * ENHANCED: Convert recurring pattern object to RRule string
+ *  Convert recurring pattern object to RRule string
  * @param {Object} pattern - The recurring pattern object
  * @param {Date} startDate - The start date for the recurrence
  * @returns {string} RRule string
@@ -17,7 +17,7 @@ export function patternToRRule(pattern, startDate) {
     dtstart: new Date(startDate)
   };
 
-  // ENHANCED: Handle new frequency format
+  //  Handle new frequency format
   switch (pattern.frequency) {
     case 'daily':
       options.freq = RRule.DAILY;
@@ -70,7 +70,7 @@ export function patternToRRule(pattern, startDate) {
       throw new Error(`Unsupported recurring pattern frequency: ${pattern.frequency}`);
   }
 
-  // ENHANCED: Handle end conditions with proper validation
+  //  Handle end conditions with proper validation
   if (pattern.endDate && pattern.endOccurrences) {
     throw new Error('Cannot specify both end date and end occurrences');
   }
@@ -93,7 +93,7 @@ export function patternToRRule(pattern, startDate) {
 }
 
 /**
- * NEW: Calculate due date from start date and duration
+ *  Calculate due date from start date and duration
  * @param {Date} startDate - Start date
  * @param {Object} duration - Duration object
  * @returns {Date} Due date
@@ -110,7 +110,7 @@ export function calculateDueDate(startDate, duration) {
 }
 
 /**
- * NEW: Calculate duration from start and due dates
+ *  Calculate duration from start and due dates
  * @param {Date} startDate - Start date
  * @param {Date} dueDate - Due date
  * @returns {Object} Duration object
@@ -235,7 +235,7 @@ export function rruleToPattern(rruleString) {
   }
 }
 /**
- * NEW: Create task instance from recurring pattern
+ *  Create task instance from recurring pattern
  * @param {Object} parentTask - The parent recurring task
  * @param {Date} instanceDate - The date for this instance
  * @param {Number} instanceNumber - The instance number
@@ -290,7 +290,7 @@ export async function createTaskInstance(parentTask, instanceDate, instanceNumbe
 }
 
 /**
- * NEW: Generate recurrence preview
+ *  Generate recurrence preview
  * @param {Object} task - The task being edited
  * @param {Object} updateData - The update data
  * @param {string} editScope - The edit scope
@@ -371,7 +371,7 @@ export async function generateRecurrencePreview(task, updateData, editScope, mod
 }
 
 /**
- * NEW: Track recurrence pattern changes
+ *  Track recurrence pattern changes
  * @param {Object} task - The task being updated
  * @param {Object} updateData - The update data
  * @returns {Object} Change tracking information
@@ -408,7 +408,7 @@ export function trackRecurrenceChanges(task, updateData) {
 }
 
 /**
- * ENHANCED: Handle recurring task editing with different scopes
+ *  Handle recurring task editing with different scopes
  * @param {Object} task - The task being edited
  * @param {Object} updateData - The update data
  * @param {string} editScope - 'this_instance', 'this_and_future', or 'all_instances'

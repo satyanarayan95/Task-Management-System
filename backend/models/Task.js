@@ -258,7 +258,7 @@ taskSchema.index({ assignees: 1 });
 taskSchema.index({ dueDate: 1, status: 1 }); // For scheduler queries
 taskSchema.index({ isRecurring: 1, status: 1 }); // For recurring task queries
 
-// NEW: Additional indexes for enhanced functionality
+//  Additional indexes for enhanced functionality
 taskSchema.index({ parentTask: 1, instanceNumber: 1 });
 taskSchema.index({ recurrenceVersion: 1 });
 taskSchema.index({ isRecurring: 1, startDate: 1 });
@@ -314,7 +314,7 @@ taskSchema.methods.getUserPermission = function(userId) {
   return null;
 };
 
-// NEW: Method to check if task has any duration
+//  Method to check if task has any duration
 taskSchema.methods.hasDuration = function() {
   return this.duration && (
     this.duration.years > 0 ||
@@ -325,7 +325,7 @@ taskSchema.methods.hasDuration = function() {
   );
 };
 
-// NEW: Method to get duration in minutes (for scheduler)
+//  Method to get duration in minutes (for scheduler)
 taskSchema.methods.getDurationInMinutes = function() {
   if (!this.duration) return 0;
   
@@ -339,13 +339,13 @@ taskSchema.methods.getDurationInMinutes = function() {
   return totalMinutes;
 };
 
-// NEW: Method to check if task is overdue
+//  Method to check if task is overdue
 taskSchema.methods.isOverdue = function() {
   if (!this.dueDate || this.status === 'done') return false;
   return new Date(this.dueDate) < new Date();
 };
 
-// NEW: Method to get next occurrence date for recurring tasks
+//  Method to get next occurrence date for recurring tasks
 taskSchema.methods.getNextOccurrence = function() {
   if (!this.isRecurring || !this.recurringPattern) return null;
   
@@ -358,7 +358,7 @@ taskSchema.methods.getNextOccurrence = function() {
   }
 };
 
-// NEW: Method to validate recurrence pattern
+//  Method to validate recurrence pattern
 taskSchema.methods.validateRecurrencePattern = function() {
   if (!this.isRecurring) return { valid: true };
   

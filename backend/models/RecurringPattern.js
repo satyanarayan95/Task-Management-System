@@ -20,7 +20,7 @@ const recurringPatternSchema = new mongoose.Schema({
     required: [true, 'RRule string is required']
   },
   
-  // NEW: Track the duration for instances
+  //  Track the duration for instances
   instanceDuration: {
     type: durationSchema,
     required: [true, 'Instance duration is required'],
@@ -33,7 +33,7 @@ const recurringPatternSchema = new mongoose.Schema({
     }
   },
   
-  // NEW: Timezone for accurate scheduling
+  //  Timezone for accurate scheduling
   timezone: {
     type: String,
     default: 'UTC',
@@ -50,7 +50,7 @@ const recurringPatternSchema = new mongoose.Schema({
     }
   },
   
-  // Enhanced tracking
+  // tracking
   nextDue: {
     type: Date,
     required: [true, 'Next due date is required'],
@@ -67,7 +67,7 @@ const recurringPatternSchema = new mongoose.Schema({
     default: Date.now
   },
   
-  // NEW: Track pattern version
+  //  Track pattern version
   patternVersion: {
     type: Number,
     default: 1,
@@ -79,7 +79,7 @@ const recurringPatternSchema = new mongoose.Schema({
     default: true
   },
   
-  // NEW: Statistics
+  //  Statistics
   totalInstancesCreated: {
     type: Number,
     default: 0,
@@ -97,7 +97,7 @@ const recurringPatternSchema = new mongoose.Schema({
     }
   },
   
-  // NEW: End conditions from parent task
+  //  End conditions from parent task
   endDate: {
     type: Date,
     validate: {
@@ -124,7 +124,7 @@ const recurringPatternSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// NEW: Method to check if recurrence should continue
+//  Method to check if recurrence should continue
 recurringPatternSchema.methods.shouldContinue = function() {
   if (!this.isActive) return false;
   
@@ -137,7 +137,7 @@ recurringPatternSchema.methods.shouldContinue = function() {
   return true;
 };
 
-// NEW: Method to get next occurrence date
+//  Method to get next occurrence date
 recurringPatternSchema.methods.getNextOccurrence = function(after = new Date()) {
   try {
     const { getNextOccurrence } = require('../utils/recurringTasks.js');
@@ -148,7 +148,7 @@ recurringPatternSchema.methods.getNextOccurrence = function(after = new Date()) 
   }
 };
 
-// NEW: Method to update next due date
+//  Method to update next due date
 recurringPatternSchema.methods.updateNextDue = function() {
   const next = this.getNextOccurrence(this.nextDue);
   if (next) {
@@ -161,7 +161,7 @@ recurringPatternSchema.methods.updateNextDue = function() {
   return false;
 };
 
-// NEW: Method to increment instance count
+//  Method to increment instance count
 recurringPatternSchema.methods.incrementInstances = function(instanceDate) {
   this.totalInstancesCreated += 1;
   this.lastInstanceDate = instanceDate;
