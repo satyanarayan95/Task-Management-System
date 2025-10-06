@@ -242,13 +242,30 @@ const TaskForm = ({
         delete taskData.startDate;
       }
       
-      if (isRecurring && recurringPattern) {
+      if (isRecurring) {
+        // Ensure a valid recurringPattern is included for recurring tasks
+        const safePattern = recurringPattern || {
+          frequency: 'daily',
+          interval: 1,
+          timezone: 'UTC',
+          endDate: null,
+          endOccurrences: null
+        };
+        // sanitize timezone
+        if (!safePattern.timezone || typeof safePattern.timezone !== 'string' || safePattern.timezone.trim() === '') {
+          safePattern.timezone = 'UTC';
+        }
+        // remove conflicting end conditions
+        if (safePattern.endDate && safePattern.endOccurrences) {
+          safePattern.endOccurrences = null;
+        }
+
         if (!duration && timingMode !== 'duration') {
           toast.error('Duration is required for recurring tasks');
           return;
         }
-        
-        taskData.recurringPattern = recurringPattern;
+
+        taskData.recurringPattern = safePattern;
       }
       
       if (mode === 'edit' && task && (task.isRecurring || isRecurring)) {
@@ -658,8 +675,17 @@ const TaskForm = ({
                       onCheckedChange={(checked) => {
                         setIsRecurring(checked);
                         if (checked) {
-                          // When enabling recurrence, force duration mode
+                          // When enabling recurrence, force duration mode and ensure a default recurring pattern exists
                           setTimingMode('duration');
+                          setRecurringPattern(prev => prev || {
+                            frequency: 'daily',
+                            interval: 1,
+                            daysOfWeek: [],
+                            dayOfMonth: 1,
+                            endDate: null,
+                            endOccurrences: null,
+                            timezone: 'UTC'
+                          });
                         }
                         if (!checked) {
                           setRecurringPattern(null);

@@ -251,7 +251,6 @@ router.post('/', async (req, res) => {
       }
     }
     
-    // Handle duration and due date logic
     const taskData = {
       ...validatedData,
       owner: req.user._id,
@@ -259,6 +258,7 @@ router.post('/', async (req, res) => {
       category: validatedData.category && validatedData.category.trim() !== '' ? validatedData.category : undefined
     };
 
+    // Handle duration and due date logic
     if (validatedData.startDate) {
       taskData.startDate = new Date(validatedData.startDate);
     } else {
@@ -597,8 +597,7 @@ router.put('/:id', async (req, res) => {
         const editResult = await handleRecurringTaskEdit(
           task,
           updateData,
-          editScope,
-          { Task, RecurringPattern }
+          editScope
         );
         
         // If we created a new instance (for 'this_instance' scope), return that instead
@@ -885,8 +884,7 @@ router.delete('/:id', async (req, res) => {
         
         const deleteResult = await handleRecurringTaskDelete(
           task,
-          deleteScope,
-          { Task, RecurringPattern }
+          deleteScope
         );
         
         res.json({ 

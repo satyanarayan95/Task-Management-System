@@ -134,8 +134,8 @@ const useAuthStore = create(
         const { lastTokenRefresh } = get()
         if (!lastTokenRefresh) return false
         
-        const fiftyMinutesAgo = Date.now() - (50 * 60 * 1000)
-        return lastTokenRefresh < fiftyMinutesAgo
+        const tenMinutesAgo = Date.now() - (10 * 60 * 1000)
+        return lastTokenRefresh < tenMinutesAgo
       },
 
       initializeAuth: async () => {

@@ -73,9 +73,14 @@ const RecurrencePattern = ({
   };
 
   const updatePattern = (updates) => {
-    const newPattern = { ...pattern, ...updates };
-    setPattern(newPattern);
-    onChange?.(newPattern);
+    const merged = { ...pattern, ...updates };
+    // Normalize endDate to ISO string or null to match backend schema expectations
+    const normalized = {
+      ...merged,
+      endDate: merged.endDate ? (typeof merged.endDate === 'string' ? merged.endDate : new Date(merged.endDate).toISOString()) : null
+    };
+    setPattern(normalized);
+    onChange?.(normalized);
   };
 
   const toggleDayOfWeek = (dayValue) => {
@@ -329,7 +334,7 @@ const RecurrencePattern = ({
             type="date"
             value={pattern.endDate ? new Date(pattern.endDate).toISOString().split('T')[0] : ''}
             onChange={(e) => {
-              const endDate = e.target.value ? new Date(e.target.value) : null;
+              const endDate = e.target.value ? new Date(e.target.value).toISOString() : null;
               updatePattern({ endDate });
             }}
             min={startDate ? new Date(startDate).toISOString().split('T')[0] : undefined}

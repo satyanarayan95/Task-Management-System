@@ -5,7 +5,7 @@ import { getNextOccurrence } from './rruleHelper.js';
 async function createRecurringPatterns() {
   try {
     console.log('Connecting to MongoDB...');
-    await mongoose.connect('mongodb://localhost:27017/taskmanagement');
+    await mongoose.connect( process.env.MONGODB_URI || 'mongodb://localhost:27017/taskmanagement');
     console.log('Connected to MongoDB');
 
     const recurringTasks = await Task.find({ 
@@ -25,7 +25,7 @@ async function createRecurringPatterns() {
         }
 
         const rruleString = task.recurringPattern;
-        const startDate = task.startDate || task.dueDate || new Date();
+        const startDate = task.startDate || new Date();
         
         const nextOccurrence = getNextOccurrence(rruleString, startDate);
         
